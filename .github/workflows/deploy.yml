@@ -26,7 +26,7 @@ jobs:
 
       - name: Copy repo to remote server
         run: |
-          rsync -avz --delete --exclude '.git' --exclude '.github' . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/n8n-deploy
+          rsync -avz --delete --exclude '.git' --exclude '.github' -e "ssh -o StrictHostKeyChecking=no" . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/n8n-deploy
 
       - name: Deploy on remote server
         run: |
