@@ -22,22 +22,7 @@ ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} <<'EOF'
   docker compose pull
   docker compose up -d --force-recreate
 
-  echo 'Waiting for n8n container to accept commands...'
-  import_attempts=0
-  until docker compose exec -T n8n true >/dev/null 2>&1; do
-    import_attempts=$((import_attempts + 1))
-    if [ ${import_attempts} -ge 24 ]; then
-      echo 'Timed out waiting for n8n container to start.'
-      docker compose logs --no-color n8n | tail -n 100
-      exit 1
-    fi
-    sleep 5
-  done
-
-  echo 'Importing workflows into n8n...'
-  docker compose exec -T n8n n8n import:workflow --separate --input=/home/node/.n8n/workflows
-
-  echo 'Workflow import completed.'
+  bash ./import-workflows.sh docker compose
   docker compose ps
   rm -rf /tmp/n8n-deploy
 EOF

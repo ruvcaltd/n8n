@@ -17,19 +17,6 @@ echo "Database initialized successfully!"
 echo "Starting n8n..."
 docker-compose up -d n8n
 
-echo "Waiting for n8n container to accept commands..."
-attempts=0
-until docker-compose exec -T n8n true >/dev/null 2>&1; do
-  attempts=$((attempts + 1))
-  if [ ${attempts} -ge 24 ]; then
-    echo "Timed out waiting for n8n container to start"
-    docker-compose logs --tail=100 n8n
-    exit 1
-  fi
-  sleep 5
-done
-
-echo "Importing workflows into n8n..."
-docker-compose exec -T n8n n8n import:workflow --separate --input=/home/node/.n8n/workflows
+bash ./import-workflows.sh docker-compose
 
 echo "Setup complete! Access n8n at http://localhost:5678"
