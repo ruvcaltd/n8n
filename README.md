@@ -150,6 +150,17 @@ Required DNS and network setup:
 
 After startup, Traefik automatically requests and renews certificates via Let's Encrypt.
 
+## Shared Port Setup (when :80/:443 are already in use)
+
+If your server already has another web app/proxy bound to ports `80/443`, this project can run Traefik on an internal port and let the existing proxy route by hostname.
+
+- Set `TRAEFIK_BIND_IP=127.0.0.1` and `TRAEFIK_HTTP_PORT=8080` in `.env`
+- Keep `N8N_DOMAIN` set to your n8n hostname
+- Configure your existing reverse proxy to forward `Host: N8N_DOMAIN` to `http://127.0.0.1:8080`
+- TLS/Let's Encrypt remains managed by your existing edge proxy in this mode
+
+Note: DNS alone cannot select containers. Hostname routing happens inside the proxy that owns `80/443`.
+
 ## GitHub Actions deployment
 
 This repository includes a deploy workflow for Linux VPS deployment:
