@@ -4,14 +4,19 @@
   "nodes": [
     {
       "parameters": {
-        "events": ["message"],
+        "events": [
+          "message"
+        ],
         "resource": "update"
       },
       "id": "telegram-trigger",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -21,7 +26,10 @@
       "name": "Parse Telegram Message",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [250, 0]
+      "position": [
+        250,
+        0
+      ]
     },
     {
       "parameters": {
@@ -33,7 +41,10 @@
       "name": "Get Conversation History",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
-      "position": [500, 0]
+      "position": [
+        500,
+        0
+      ]
     },
     {
       "parameters": {
@@ -43,7 +54,10 @@
       "name": "Check if Proceed",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [750, 0]
+      "position": [
+        750,
+        0
+      ]
     },
     {
       "parameters": {
@@ -56,7 +70,10 @@
       "name": "Store Message in DB",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
-      "position": [1000, 0]
+      "position": [
+        1000,
+        0
+      ]
     },
     {
       "parameters": {
@@ -67,7 +84,10 @@
       "name": "Ask for More Input",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1250, 0]
+      "position": [
+        1250,
+        0
+      ]
     },
     {
       "parameters": {
@@ -77,7 +97,10 @@
       "name": "Prepare Input for Agents",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [750, 300]
+      "position": [
+        750,
+        300
+      ]
     },
     {
       "parameters": {
@@ -91,7 +114,10 @@
       "name": "Call Planner Agent",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -105,7 +131,10 @@
       "name": "Call Writer Agent",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -119,7 +148,10 @@
       "name": "Call Reviewer Agent",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
-      "position": [1500, 300]
+      "position": [
+        1500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -133,17 +165,73 @@
       "name": "Call Image Agent",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
-      "position": [1750, 300]
+      "position": [
+        1750,
+        300
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const planner = $input.first().json;\nconst writer = $input.all()[1].json;\nconst reviewer = $input.all()[2].json;\nconst imageAgent = $input.all()[3].json;\n\n// Orchestrator logic: decide what to include\nconst includeImage = imageAgent.includeInPost && imageAgent.imageUrl;\n\nconst finalPost = {\n  text: reviewer.finalContent,\n  hashtags: writer.hashtags,\n  imageUrl: includeImage ? imageAgent.imageUrl : null,\n  chatId: planner.chatId\n};\n\nreturn finalPost;"
+        "functionCode": "const planner = $input.first().json;\nconst writer = $input.all()[1].json;\nconst reviewer = $input.all()[2].json;\nconst imageAgent = $input.all()[3].json;\n\nconst includeImage = imageAgent.includeInPost && imageAgent.imageUrl;\n\n// Default: draft mode. Change POST_MODE env var or pass as parameter to publish\nconst postMode = process.env.POST_MODE || 'draft';\n\nreturn {\n  text: reviewer.finalContent,\n  hashtags: writer.hashtags,\n  imageUrl: includeImage ? imageAgent.imageUrl : null,\n  chatId: planner.chatId,\n  postMode: postMode\n};"
       },
       "id": "orchestrate-output",
       "name": "Orchestrate Final Output",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [2000, 300]
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $input.first().json.chatId }}",
+        "text": "\u2705 Your LinkedIn post has been {{ $input.first().json.mode }}.{{ $input.first().json.mode === 'draft' ? ' Review at /opt/n8n or in n8n UI.' : '' }}\n\n\ud83d\udcdd Content: {{ $input.first().json }}"
+      },
+      "id": "send-success-message",
+      "name": "Send Success Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        2500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": [
+          {
+            "value1": "={{$json.postMode}}",
+            "operation": "equal",
+            "value2": "draft"
+          }
+        ],
+        "continueOnFail": true
+      },
+      "id": "if-draft-mode",
+      "name": "If Draft Mode",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "executeQuery": true,
+        "queryString": "INSERT INTO drafts (chat_id, content, hashtags, image_url, status, created_at) VALUES ($1, $2, $3, $4, 'draft', NOW()) RETURNING id",
+        "queryParameters": "{{$json.chatId}},{{$json.text}},{{ $json.hashtags }},{{$json.imageUrl}}"
+      },
+      "id": "save-draft",
+      "name": "Save Draft to DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        2350,
+        200
+      ]
     },
     {
       "parameters": {
@@ -153,24 +241,29 @@
           "Authorization": "Bearer {{ $credentials.linkedinOAuth.accessToken }}",
           "X-Restli-Protocol-Version": "2.0.0"
         },
-        "body": "={{ $input.first().json.imageUrl ? {\n  'contentType': 'TEXT,IMAGE',\n  'commentary': $input.first().json.text,\n  'visibility': 'PUBLIC',\n  'media': [{'type': 'IMAGE', 'url': $input.first().json.imageUrl}]\n} : {\n  'contentType': 'TEXT',\n  'commentary': $input.first().json.text,\n  'visibility': 'PUBLIC'\n} }}"
+        "body": "={{$json.imageUrl ? {'contentType':'TEXT,IMAGE','commentary':$json.text,'visibility':'PUBLIC','media':[{'type':'IMAGE','url':$json.imageUrl}]} : {'contentType':'TEXT','commentary':$json.text,'visibility':'PUBLIC'}}}"
       },
-      "id": "create-linkedin-post",
-      "name": "Create LinkedIn Post",
+      "id": "post-to-linkedin",
+      "name": "Post to LinkedIn",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
-      "position": [2250, 300]
+      "position": [
+        2350,
+        400
+      ]
     },
     {
       "parameters": {
-        "chatId": "{{ $input.first().json.chatId }}",
-        "text": "✅ Your LinkedIn post has been created successfully!\\n\\n📝 Post content: {{ $input.first().json.text.substring(0, 100) }}..."
+        "functionCode": "const isDraft = $input.all()[0].json.postMode === 'draft';\nconst fileInfo = isDraft ? $input.all()[1].json : $input.all()[1].json;\n\nif (isDraft) {\n  return { success: true, mode: 'draft', draftId: fileInfo.id };\n} else {\n  return { success: true, mode: 'public', postId: fileInfo.body };\n}"
       },
-      "id": "send-success-message",
-      "name": "Send Success Message",
-      "type": "n8n-nodes-base.telegram",
+      "id": "post-result-handler",
+      "name": "Post Result Handler",
+      "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [2500, 300]
+      "position": [
+        2500,
+        300
+      ]
     }
   ],
   "connections": {
@@ -295,14 +388,56 @@
       "main": [
         [
           {
-            "node": "Create LinkedIn Post",
+            "node": "If Draft Mode",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Create LinkedIn Post": {
+    "If Draft Mode": {
+      "main": [
+        [
+          {
+            "node": "Save Draft to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "else": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Draft to DB": {
+      "main": [
+        [
+          {
+            "node": "Post Result Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Post Result Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Result Handler": {
       "main": [
         [
           {

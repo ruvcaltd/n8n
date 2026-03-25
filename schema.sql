@@ -36,6 +36,18 @@ CREATE TABLE IF NOT EXISTS workflow_logs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- LinkedIn Drafts Table
+CREATE TABLE IF NOT EXISTS drafts (
+  id SERIAL PRIMARY KEY,
+  chat_id BIGINT,
+  content TEXT,
+  hashtags TEXT[],
+  image_url TEXT,
+  status VARCHAR(50),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_conversation_chat_id ON conversation_history(chat_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id);

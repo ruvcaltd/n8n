@@ -97,7 +97,23 @@ To use **OpenRouter**: Update the OpenAI credential endpoint to `https://api.ope
 3. Send images if you want them analyzed or included
 4. Send "proceed" when ready
 5. The bot will process your input through multiple AI agents
-6. A LinkedIn post will be automatically created
+6. A LinkedIn post will be created (default: **saved as draft**)
+
+## Post Modes
+
+By default, posts are **saved as drafts** for manual review before publishing.
+
+To change the behavior, set the `POST_MODE` environment variable:
+
+- `POST_MODE=draft` (default): Saves to database, waits for manual review
+- `POST_MODE=public`: Publishes directly to LinkedIn
+
+Update in `.env`:
+```
+POST_MODE=draft
+```
+
+Or set in n8n workflow if needed. Draft posts are stored in the `drafts` table and can be reviewed/published manually.
 
 ## Database Schema
 
@@ -105,6 +121,7 @@ The `schema.sql` file creates tables for:
 - `conversation_history`: Stores chat messages
 - `user_sessions`: Manages user sessions
 - `workflow_logs`: Logs agent executions
+- `drafts`: Stores LinkedIn post drafts for manual review
 
 ## Stopping the Services
 
