@@ -31,7 +31,7 @@ This repository contains infrastructure as code for deploying n8n using Docker a
 
 4. Access n8n at http://localhost:5678
 
-5. Workflows are imported automatically on container startup from the `workflows/` directory.
+5. Workflows are imported automatically after `n8n` starts from the `workflows/` directory.
    Their top-level IDs are version-controlled so the main workflow can keep stable `Execute Workflow` references.
 
 6. OpenRouter (optional) and model selection:
@@ -43,7 +43,7 @@ This repository contains infrastructure as code for deploying n8n using Docker a
 
 ## Workflows
 
-Workflow JSON files are mounted into the container and imported during startup with `n8n import:workflow --separate`.
+Workflow JSON files are mounted into the container and imported after startup with `n8n import:workflow --separate`.
 Because the files include stable top-level workflow IDs, repeat deploys keep the cross-workflow references intact.
 
 ### Main Workflow: `telegram-ai-content-creator.json`
@@ -150,7 +150,7 @@ This repository includes a deploy workflow for Linux VPS deployment:
 2. Create `/opt/n8n/.env` on VPS with your values.
 3. Allow the deploy user to run `docker compose`.
 
-Deployments now force-recreate the containers and wait for the `n8n` startup logs to confirm that workflow import has started.
+Deployments now force-recreate the containers, wait for the `n8n` container to accept commands, and then run workflow import explicitly.
 
 ## Volumes
 
