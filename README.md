@@ -9,6 +9,7 @@ This repository contains infrastructure as code for deploying n8n using Docker a
 - Telegram Bot Token (from @BotFather)
 - OpenAI API Key
 - LinkedIn OAuth credentials
+- A public domain name pointing to your server (for HTTPS via Let's Encrypt)
 
 ## Setup
 
@@ -29,7 +30,7 @@ This repository contains infrastructure as code for deploying n8n using Docker a
    ./init.sh
    ```
 
-4. Access n8n at http://localhost:5678
+4. Access n8n at `https://<your-domain>` (served through Traefik)
 
 5. Workflows are imported automatically after `n8n` starts from the `workflows/` directory.
    The import step waits for the first n8n user to exist in Postgres, imports with `--userId`, and then restarts `n8n` once so the UI reloads the updated database state.
@@ -68,6 +69,8 @@ Update the `.env` file with your values:
 - `N8N_BASIC_AUTH_PASSWORD`: Admin password
 - `DB_POSTGRESDB_PASSWORD`: PostgreSQL password
 - `N8N_ENCRYPTION_KEY`: Random encryption key for sensitive data
+- `N8N_DOMAIN`: Public domain for n8n (example: `n8n.example.com`)
+- `TRAEFIK_LETSENCRYPT_EMAIL`: Email used by Let's Encrypt
 
 ## Credentials Setup in n8n
 
@@ -134,6 +137,18 @@ The `schema.sql` file creates tables for:
 ```bash
 docker-compose down
 ```
+
+## HTTPS (Traefik + Let's Encrypt)
+
+This stack terminates TLS at Traefik and forwards traffic to n8n.
+
+Required DNS and network setup:
+
+- Point an `A` record for `N8N_DOMAIN` to your server IP
+- Ensure ports `80` and `443` are open on your firewall
+- Set `N8N_DOMAIN` and `TRAEFIK_LETSENCRYPT_EMAIL` in `.env`
+
+After startup, Traefik automatically requests and renews certificates via Let's Encrypt.
 
 ## GitHub Actions deployment
 

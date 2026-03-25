@@ -15,8 +15,8 @@ docker-compose exec -T postgres psql -U n8n -d n8n < schema.sql
 echo "Database initialized successfully!"
 
 echo "Starting n8n..."
-docker-compose up -d n8n
+docker-compose up -d traefik n8n
 
 bash ./import-workflows.sh docker-compose
 
-echo "Setup complete! Access n8n at http://localhost:5678"
+echo "Setup complete! Access n8n at https://${N8N_DOMAIN}"
