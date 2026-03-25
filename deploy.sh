@@ -9,7 +9,6 @@ fi
 REMOTE_PATH="/opt/n8n"
 
 rsync -avz --delete --exclude '.git' --exclude '.github' . ${VPS_USER}@${VPS_HOST}:/tmp/n8n-deploy
-
 ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} <<'EOF'
   set -e
   sudo mkdir -p ${REMOTE_PATH}
