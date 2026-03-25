@@ -33,14 +33,14 @@ jobs:
 
       - name: Copy repo to remote server
         run: |
-          rsync -avz --delete --exclude '.git' --exclude '.github' -e "ssh -o StrictHostKeyChecking=no" . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/n8n-deploy
+          rsync -avz --delete --exclude '.git' --exclude '.github' --exclude '.env' -e "ssh -o StrictHostKeyChecking=no" . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/n8n-deploy
 
       - name: Deploy on remote server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<'EOF'
             set -e
             mkdir -p /opt/n8n
-            rsync -avz --delete /tmp/n8n-deploy/ /opt/n8n/
+            rsync -avz --delete --exclude '.env' /tmp/n8n-deploy/ /opt/n8n/
             cd /opt/n8n
             if [ ! -f .env ]; then
               echo 'ERROR: .env missing on VPS. Copy your env file or configure secrets.'
