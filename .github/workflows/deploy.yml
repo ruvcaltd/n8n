@@ -39,8 +39,8 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<'EOF'
             set -e
-            sudo mkdir -p /opt/n8n
-            sudo rsync -avz --delete /tmp/n8n-deploy/ /opt/n8n/
+            sudo -n mkdir -p /opt/n8n
+            sudo -n rsync -avz --delete /tmp/n8n-deploy/ /opt/n8n/
             cd /opt/n8n
             if [ ! -f .env ]; then
               echo 'ERROR: .env missing on VPS. Copy your env file or configure secrets.'
