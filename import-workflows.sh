@@ -41,7 +41,21 @@ IMPORT_ARGS=(import:workflow --separate --input=/home/node/.n8n/workflows)
 echo "Importing workflows into n8n for user ${OWNER_ID}..."
 IMPORT_ARGS+=(--userId="${OWNER_ID}")
 
-"${COMPOSE_CMD[@]}" exec -T n8n n8n "${IMPORT_ARGS[@]}"
+set +e
+IMPORT_OUTPUT=$("${COMPOSE_CMD[@]}" exec -T n8n n8n "${IMPORT_ARGS[@]}" 2>&1)
+IMPORT_EXIT=$?
+set -e
+
+echo "${IMPORT_OUTPUT}"
+
+if [ "${IMPORT_EXIT}" -ne 0 ]; then
+  if printf '%s' "${IMPORT_OUTPUT}" | grep -qi 'already owned by the user with the ID'; then
+    echo 'n8n reported existing credential ownership during import. Treating this as idempotent and continuing.'
+  else
+    echo 'Workflow import failed with a non-idempotent error.'
+    exit "${IMPORT_EXIT}"
+  fi
+fi
 
 WORKFLOW_COUNT=$("${COMPOSE_CMD[@]}" exec -T postgres psql -U n8n -d n8n -Atqc 'SELECT COUNT(*) FROM workflow_entity;' 2>/dev/null | tr -d '\r')
 if [ -n "${WORKFLOW_COUNT}" ]; then
