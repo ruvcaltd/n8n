@@ -1,0 +1,68 @@
+{
+  "name": "Writer Agent",
+  "description": "AI agent that writes engaging LinkedIn post content",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "return {\n  systemPrompt: `You are an expert LinkedIn content writer. Your role is to create compelling, professional content that drives engagement.\n\nBased on the content plan, write a high-quality LinkedIn post that:\n1. Has a strong hook in the first 3 lines\n2. Provides value to the reader\n3. Includes storytelling elements\n4. Ends with a clear call-to-action\n5. Is optimized for LinkedIn's algorithm\n\nFormat your response as JSON with these fields:\n{\n  \"postContent\": \"string (200-300 words)\",\n  \"hashtags\": [\"array of 3-5 relevant hashtags\"],\n  \"engagementTips\": [\"array of tips\"],\n  \"wordCount\": \"number\"\n}\n\nMake it authentic, conversational, and professional.`\n};"
+      },
+      "id": "set-writer-prompt",
+      "name": "Set Writer Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": "=[{\n  'role': 'system',\n  'content': $input.first().json.systemPrompt\n}, {\n  'role': 'user',\n  'content': `Content Plan: ${JSON.stringify($input.first().json)}\\n\\nPlease write an engaging LinkedIn post based on this plan.`\n}]",
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 1500
+        }
+      },
+      "id": "openai-writer",
+      "name": "OpenAI Writer",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json.choices[0].message.content;\n\ntry {\n  const content = JSON.parse(response);\n  return {\n    ...content,\n    chatId: $input.first().json.chatId\n  };\n} catch (e) {\n  // Fallback parsing\n  const lines = response.split('\\n');\n  const hashtags = lines.filter(l => l.includes('#')).map(l => l.trim());\n  const postContent = lines.filter(l => !l.includes('#')).join('\\n');\n  \n  return {\n    postContent: postContent || response,\n    hashtags: hashtags.length > 0 ? hashtags : ['#LinkedIn', '#ProfessionalDevelopment'],\n    engagementTips: ['Ask questions', 'Use emojis', 'Tag relevant people'],\n    wordCount: (postContent || response).split(' ').length,\n    chatId: $input.first().json.chatId,\n    rawResponse: response\n  };\n}"
+      },
+      "id": "parse-writer-output",
+      "name": "Parse Writer Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 0]
+    }
+  ],
+  "connections": {
+    "Set Writer Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Writer": {
+      "main": [
+        [
+          {
+            "node": "Parse Writer Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null
+}

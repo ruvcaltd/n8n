@@ -1,0 +1,306 @@
+{
+  "name": "Image Agent",
+  "description": "AI agent that handles image processing, analysis, and generation for LinkedIn posts",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\nconst hasPhoto = input.hasPhoto;\nconst photoId = input.photoId;\nconst content = input.content || '';\n\nreturn {\n  hasPhoto: hasPhoto,\n  photoId: photoId,\n  content: content,\n  chatId: input.chatId,\n  systemPrompt: `You are an expert visual content strategist for LinkedIn. Your role is to analyze images and suggest visual enhancements for posts.\n\nBased on the content and any provided images, decide:\n1. If images should be included in the final post\n2. What type of image would best complement the content\n3. Image placement and sizing recommendations\n4. Alternative image suggestions if needed\n\nFormat your response as JSON with these fields:\n{\n  \"includeInPost\": \"boolean\",\n  \"imageUrl\": \"string (if existing image)\",\n  \"imageAnalysis\": \"string\",\n  \"recommendations\": [\"array\"],\n  \"generateNew\": \"boolean\",\n  \"imageDescription\": \"string (for generation)\"\n}`\n};"
+      },
+      "id": "set-image-prompt",
+      "name": "Set Image Agent Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\n\nif (input.hasPhoto) {\n  // Download and analyze the image\n  return {\n    action: 'analyze',\n    photoId: input.photoId,\n    content: input.content,\n    systemPrompt: input.systemPrompt\n  };\n} else {\n  // Generate image suggestions\n  return {\n    action: 'suggest',\n    content: input.content,\n    systemPrompt: input.systemPrompt\n  };\n}"
+      },
+      "id": "decide-image-action",
+      "name": "Decide Image Action",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.telegram.org/bot{{ $credentials.telegram.botToken }}/getFile?file_id={{ $input.first().json.photoId }}",
+        "options": {}
+      },
+      "id": "get-file-info",
+      "name": "Get Telegram File Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.telegram.org/file/bot{{ $credentials.telegram.botToken }}/{{ $input.first().json.result.file_path }}",
+        "options": {
+          "responseFormat": "arraybuffer"
+        }
+      },
+      "id": "download-image",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-vision",
+        "messages": "=[{\n  'role': 'user',\n  'content': [\n    {\n      'type': 'text',\n      'text': `Analyze this image in the context of this LinkedIn post content: \"${$input.first().json.content}\". Should this image be included in the post? Provide recommendations.`\n    },\n    {\n      'type': 'image_url',\n      'image_url': {\n        'url': `data:image/jpeg;base64,${$input.first().json.body.toString('base64')}`\n      }\n    }\n  ]\n}]",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 500
+        }
+      },
+      "id": "analyze-image",
+      "name": "Analyze Image with Vision",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": "=[{\n  'role': 'system',\n  'content': $input.first().json.systemPrompt\n}, {\n  'role': 'user',\n  'content': `Content: ${$input.first().json.content}\\n\\nSuggest image concepts for this LinkedIn post.`\n}]",
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 400
+        }
+      },
+      "id": "suggest-image",
+      "name": "Suggest Image Concepts",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\n\nif (input.action === 'analyze') {\n  const analysis = input.choices[0].message.content;\n  const includeInPost = analysis.toLowerCase().includes('yes') || analysis.toLowerCase().includes('include');\n  const imageUrl = includeInPost ? `data:image/jpeg;base64,${input.body.toString('base64')}` : null;\n  return {\n    includeInPost: includeInPost,\n    imageUrl: imageUrl,\n    imageAnalysis: analysis,\n    recommendations: ['Image analyzed', 'Decision made based on content fit'],\n    generateNew: !includeInPost,\n    imageDescription: includeInPost ? null : `Create an attention-grabbing LinkedIn visual based on: ${input.content}` ,\n    chatId: input.chatId\n  };\n} else {\n  const suggestions = input.choices[0].message.content;\n  return {\n    includeInPost: false,\n    imageUrl: null,\n    imageAnalysis: 'No image provided',\n    recommendations: suggestions.split('\n').filter(s => s.trim()),\n    generateNew: true,\n    imageDescription: suggestions || `Create professional LinkedIn visual for: ${input.content}` ,\n    chatId: input.chatId\n  };\n}"
+      },
+      "id": "process-image-decision",
+      "name": "Process Image Decision",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": [
+          {
+            "value1": "={{$json.includeInPost}}",
+            "operation": "equal",
+            "value2": "true"
+          }
+        ],
+        "continueOnFail": true
+      },
+      "id": "if-has-image",
+      "name": "If Has Image",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-image-1",
+        "prompt": "={{ $json.imageDescription || 'Professional LinkedIn post image with modern flat-style, consistent with a business content theme.' }}",
+        "size": "1024x1024",
+        "responseFormat": "b64_json"
+      },
+      "id": "generate-image",
+      "name": "Generate Image",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\nif (input.data && input.data[0] && input.data[0].b64_json) {\n  return { includeInPost: true, imageUrl: `data:image/png;base64,${input.data[0].b64_json}`, imageAnalysis: 'Generated image', recommendations: [], generateNew: false, chatId: input.chatId };\n}\nreturn { includeInPost: false, imageUrl: null, imageAnalysis: 'Image generation failed', recommendations: [], generateNew: false, chatId: input.chatId };"
+      },
+      "id": "process-generated-image",
+      "name": "Process Generated Image",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const existing = $input.first().json; const generated = $input.second().json; return { includeInPost: true, imageUrl: existing.imageUrl || generated.imageUrl, imageAnalysis: existing.imageAnalysis || generated.imageAnalysis, recommendations: (existing.recommendations||[]).concat(generated.recommendations||[]), chatId: existing.chatId || generated.chatId };"
+      },
+      "id": "final-image-output",
+      "name": "Final Image Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Set Image Agent Prompt": {
+      "main": [
+        [
+          {
+            "node": "Decide Image Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide Image Action": {
+      "main": [
+        [
+          {
+            "node": "Get File Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suggest Image Concepts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get File Info": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Analyze Image with Vision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Image with Vision": {
+      "main": [
+        [
+          {
+            "node": "Process Image Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest Image Concepts": {
+      "main": [
+        [
+          {
+            "node": "Process Image Decision",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Process Image Decision": {
+      "main": [
+        [
+          {
+            "node": "If Has Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Image": {
+      "main": [
+        [
+          {
+            "node": "Final Image Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "else": [
+        [
+          {
+            "node": "Generate Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image": {
+      "main": [
+        [
+          {
+            "node": "Process Generated Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Generated Image": {
+      "main": [
+        [
+          {
+            "node": "Final Image Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null
+}

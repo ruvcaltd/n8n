@@ -1,0 +1,68 @@
+{
+  "name": "Planner Agent",
+  "description": "AI agent that plans and structures content creation based on user input",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "return {\n  systemPrompt: `You are an expert content strategist and planner. Your role is to analyze user input and create a comprehensive plan for creating high-quality LinkedIn content.\n\nBased on the user's ideas and conversation history, provide:\n1. Main topic and key themes\n2. Target audience analysis\n3. Content structure outline\n4. Key points to cover\n5. Tone and style recommendations\n6. Potential challenges or considerations\n\nFormat your response as JSON with these fields:\n{\n  \"topic\": \"string\",\n  \"themes\": [\"array\"],\n  \"audience\": \"string\",\n  \"structure\": [\"array\"],\n  \"keyPoints\": [\"array\"],\n  \"tone\": \"string\",\n  \"considerations\": [\"array\"]\n}`\n};"
+      },
+      "id": "set-system-prompt",
+      "name": "Set System Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": "=[{\n  'role': 'system',\n  'content': $input.first().json.systemPrompt\n}, {\n  'role': 'user',\n  'content': `User input: ${$input.first().json.userInput}\\n\\nPlease create a content plan for a LinkedIn post.`\n}]",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1000
+        }
+      },
+      "id": "openai-planner",
+      "name": "OpenAI Planner",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json.choices[0].message.content;\n\ntry {\n  const plan = JSON.parse(response);\n  return {\n    ...plan,\n    chatId: $input.first().json.chatId,\n    rawResponse: response\n  };\n} catch (e) {\n  // Fallback if JSON parsing fails\n  return {\n    topic: 'Content Creation',\n    themes: ['Professional development'],\n    audience: 'LinkedIn professionals',\n    structure: ['Introduction', 'Main content', 'Conclusion'],\n    keyPoints: response.split('\\n').filter(p => p.trim()),\n    tone: 'Professional',\n    considerations: ['Engagement', 'Value addition'],\n    chatId: $input.first().json.chatId,\n    rawResponse: response\n  };\n}"
+      },
+      "id": "parse-plan",
+      "name": "Parse Plan Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 0]
+    }
+  ],
+  "connections": {
+    "Set System Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Planner": {
+      "main": [
+        [
+          {
+            "node": "Parse Plan Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null
+}

@@ -1,0 +1,320 @@
+{
+  "name": "Telegram AI Content Creator",
+  "description": "Telegram bot that collects user ideas, processes with multiple AI agents, and creates LinkedIn posts",
+  "nodes": [
+    {
+      "parameters": {
+        "events": ["message"],
+        "resource": "update"
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const msg = $input.first().json.message;\nconst hasPhoto = !!msg.photo;\nconst photoId = hasPhoto ? msg.photo[msg.photo.length - 1].file_id : null;\nconst text = msg.text || msg.caption || '';\n\nreturn {\n  chatId: msg.chat.id,\n  userId: msg.from.id,\n  text: text,\n  hasPhoto: hasPhoto,\n  photoId: photoId,\n  messageId: msg.message_id,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "parse-message",
+      "name": "Parse Telegram Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "queryString": "SELECT role, content, message_type, created_at FROM conversation_history WHERE chat_id = $1 ORDER BY created_at DESC LIMIT 20",
+        "queryParameters": "{{ $input.first().json.chatId }}"
+      },
+      "id": "get-conversation-history",
+      "name": "Get Conversation History",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [500, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\nconst text = input.text.toLowerCase().trim();\nconst history = input.data || [];\n\n// Check if user wants to proceed\nif (text === 'proceed') {\n  return { action: 'proceed', history: history.reverse() };\n}\n\n// Store the message and ask for more input\nreturn { action: 'collect', history: history, currentInput: input.text };"
+      },
+      "id": "check-proceed",
+      "name": "Check if Proceed",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [750, 0]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "executeQuery": true,
+        "queryString": "INSERT INTO conversation_history (chat_id, user_id, role, content, message_type) VALUES ($1, $2, $3, $4, $5)",
+        "queryParameters": "{{ $input.first().json.chatId }},{{ $input.first().json.userId }},'user',{{ $input.first().json.text }},'text'"
+      },
+      "id": "store-message",
+      "name": "Store Message in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1000, 0]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $input.first().json.chatId }}",
+        "text": "Got it! Please provide more details or send 'proceed' to start creating your LinkedIn post."
+      },
+      "id": "ask-more-input",
+      "name": "Ask for More Input",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1250, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.first().json;\nconst history = input.history;\n\n// Extract all user messages\nconst userMessages = history.filter(h => h.role === 'user').map(h => h.content).join('\\n');\n\nreturn {\n  userInput: userMessages,\n  chatId: input.chatId,\n  hasPhoto: input.hasPhoto,\n  photoId: input.photoId\n};"
+      },
+      "id": "prepare-agent-input",
+      "name": "Prepare Input for Agents",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "mode": "executeNode",
+        "workflowId": "planner-agent",
+        "options": {
+          "timeout": 300
+        }
+      },
+      "id": "call-planner-agent",
+      "name": "Call Planner Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "mode": "executeNode",
+        "workflowId": "writer-agent",
+        "options": {
+          "timeout": 300
+        }
+      },
+      "id": "call-writer-agent",
+      "name": "Call Writer Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "mode": "executeNode",
+        "workflowId": "reviewer-agent",
+        "options": {
+          "timeout": 300
+        }
+      },
+      "id": "call-reviewer-agent",
+      "name": "Call Reviewer Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "mode": "executeNode",
+        "workflowId": "image-agent",
+        "options": {
+          "timeout": 300
+        }
+      },
+      "id": "call-image-agent",
+      "name": "Call Image Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const planner = $input.first().json;\nconst writer = $input.all()[1].json;\nconst reviewer = $input.all()[2].json;\nconst imageAgent = $input.all()[3].json;\n\n// Orchestrator logic: decide what to include\nconst includeImage = imageAgent.includeInPost && imageAgent.imageUrl;\n\nconst finalPost = {\n  text: reviewer.finalContent,\n  hashtags: writer.hashtags,\n  imageUrl: includeImage ? imageAgent.imageUrl : null,\n  chatId: planner.chatId\n};\n\nreturn finalPost;"
+      },
+      "id": "orchestrate-output",
+      "name": "Orchestrate Final Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/rest/posts",
+        "headers": {
+          "Authorization": "Bearer {{ $credentials.linkedinOAuth.accessToken }}",
+          "X-Restli-Protocol-Version": "2.0.0"
+        },
+        "body": "={{ $input.first().json.imageUrl ? {\n  'contentType': 'TEXT,IMAGE',\n  'commentary': $input.first().json.text,\n  'visibility': 'PUBLIC',\n  'media': [{'type': 'IMAGE', 'url': $input.first().json.imageUrl}]\n} : {\n  'contentType': 'TEXT',\n  'commentary': $input.first().json.text,\n  'visibility': 'PUBLIC'\n} }}"
+      },
+      "id": "create-linkedin-post",
+      "name": "Create LinkedIn Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $input.first().json.chatId }}",
+        "text": "✅ Your LinkedIn post has been created successfully!\\n\\n📝 Post content: {{ $input.first().json.text.substring(0, 100) }}..."
+      },
+      "id": "send-success-message",
+      "name": "Send Success Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [2500, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Get Conversation History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversation History": {
+      "main": [
+        [
+          {
+            "node": "Check if Proceed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Proceed": {
+      "main": [
+        [
+          {
+            "node": "Store Message in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Input for Agents",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Store Message in DB": {
+      "main": [
+        [
+          {
+            "node": "Ask for More Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input for Agents": {
+      "main": [
+        [
+          {
+            "node": "Call Planner Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Planner Agent": {
+      "main": [
+        [
+          {
+            "node": "Call Writer Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Writer Agent": {
+      "main": [
+        [
+          {
+            "node": "Call Reviewer Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Reviewer Agent": {
+      "main": [
+        [
+          {
+            "node": "Call Image Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Image Agent": {
+      "main": [
+        [
+          {
+            "node": "Orchestrate Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrate Final Output": {
+      "main": [
+        [
+          {
+            "node": "Create LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create LinkedIn Post": {
+      "main": [
+        [
+          {
+            "node": "Send Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null
+}

@@ -1,0 +1,43 @@
+name: Deploy n8n to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: Copy repo to remote server
+        run: |
+          rsync -avz --delete --exclude '.git' --exclude '.github' . ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/n8n-deploy
+
+      - name: Deploy on remote server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<'EOF'
+            set -e
+            sudo mkdir -p /opt/n8n
+            sudo rsync -avz --delete /tmp/n8n-deploy/ /opt/n8n/
+            cd /opt/n8n
+            if [ ! -f .env ]; then
+              echo 'ERROR: .env missing on VPS. Copy your env file or configure secrets.'
+              exit 1
+            fi
+            docker compose pull
+            docker compose up -d
+            docker compose ps
+            exit
+          EOF
+
+      - name: Clean remote temp folder
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -rf /tmp/n8n-deploy'

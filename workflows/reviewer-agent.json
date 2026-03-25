@@ -1,0 +1,68 @@
+{
+  "name": "Reviewer Agent",
+  "description": "AI agent that reviews and edits content for quality and engagement",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "return {\n  systemPrompt: `You are an expert content editor and reviewer. Your role is to polish and improve LinkedIn content for maximum impact.\n\nReview the draft content and:\n1. Check for grammar, clarity, and flow\n2. Ensure professional tone and authenticity\n3. Verify alignment with the original plan\n4. Optimize for LinkedIn engagement\n5. Suggest improvements for better readability\n6. Ensure appropriate length and structure\n\nFormat your response as JSON with these fields:\n{\n  \"finalContent\": \"string (polished version)\",\n  \"improvements\": [\"array of changes made\"],\n  \"engagementScore\": \"number 1-10\",\n  \"readabilityScore\": \"number 1-10\",\n  \"recommendations\": [\"array of suggestions\"]\n}\n\nBe constructive and focus on enhancement.`\n};"
+      },
+      "id": "set-reviewer-prompt",
+      "name": "Set Reviewer Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": "=[{\n  'role': 'system',\n  'content': $input.first().json.systemPrompt\n}, {\n  'role': 'user',\n  'content': `Original Plan: ${JSON.stringify($input.first().json.plan)}\\n\\nDraft Content: ${$input.first().json.postContent}\\n\\nPlease review and improve this LinkedIn post.`\n}]",
+        "options": {
+          "temperature": 0.6,
+          "maxTokens": 1200
+        }
+      },
+      "id": "openai-reviewer",
+      "name": "OpenAI Reviewer",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "position": [250, 0]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json.choices[0].message.content;\n\ntry {\n  const review = JSON.parse(response);\n  return {\n    ...review,\n    chatId: $input.first().json.chatId\n  };\n} catch (e) {\n  // Fallback\n  return {\n    finalContent: response,\n    improvements: ['Grammar check', 'Flow improvement'],\n    engagementScore: 8,\n    readabilityScore: 8,\n    recommendations: ['Add more specific examples', 'Include a question'],\n    chatId: $input.first().json.chatId,\n    rawResponse: response\n  };\n}"
+      },
+      "id": "parse-review-output",
+      "name": "Parse Review Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 0]
+    }
+  ],
+  "connections": {
+    "Set Reviewer Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Parse Review Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null
+}
