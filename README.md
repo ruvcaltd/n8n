@@ -66,8 +66,29 @@ Update the `.env` file with your values:
 ## Credentials Setup in n8n
 
 1. **Telegram**: Create a bot with @BotFather and get the token
-2. **OpenAI**: Get your API key from OpenAI
+2. **OpenRouter** (recommended):
+   - Go to n8n Credentials > OpenAI
+   - Set **API URL** to `https://api.openrouter.ai/v1`
+   - Set **API Key** to your OpenRouter API key
+   - Models used:
+     - Chat tasks (planner/writer/reviewer): `gpt-4o` or `gpt-4o-mini`
+     - Image analysis: `gpt-4-vision` (or compatible model)
+     - Image generation: `gpt-image-1` (or equivalent)
 3. **LinkedIn**: Set up OAuth app for posting permissions
+
+## LLM Providers
+
+All agents use `n8n-nodes-base.openai` which is OpenAI API-compatible:
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| Planner | gpt-4o-mini | Content strategy analysis |
+| Writer | gpt-4o-mini | LinkedIn post creation |
+| Reviewer | gpt-4o-mini | Content polish & review |
+| Image Analyzer | gpt-4-vision | Image understanding |
+| Image Generator | gpt-image-1 | Image creation |
+
+To use **OpenRouter**: Update the OpenAI credential endpoint to `https://api.openrouter.ai/v1` in n8n UI.
 
 ## Usage
 
