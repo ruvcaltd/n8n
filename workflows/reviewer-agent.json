@@ -1,4 +1,5 @@
 {
+  "id": "reviewer-agent",
   "name": "Reviewer Agent",
   "description": "AI agent that reviews and edits content for quality and engagement",
   "nodes": [

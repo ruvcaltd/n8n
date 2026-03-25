@@ -1,4 +1,5 @@
 {
+  "id": "image-agent",
   "name": "Image Agent",
   "description": "AI agent that handles image processing, analysis, and generation for LinkedIn posts",
   "nodes": [

@@ -31,16 +31,20 @@ This repository contains infrastructure as code for deploying n8n using Docker a
 
 4. Access n8n at http://localhost:5678
 
-5. OpenRouter (optional) and model selection:
+5. Workflows are imported automatically on container startup from the `workflows/` directory.
+   Their top-level IDs are version-controlled so the main workflow can keep stable `Execute Workflow` references.
+
+6. OpenRouter (optional) and model selection:
    - In n8n OpenAI credential, set API URL to `https://api.openrouter.ai/v1` and API key to your OpenRouter key
    - Use model `gpt-4o-mini` for chat planning/writing/review tasks
    - Use model `gpt-image-1` for image generation
 
-6. Update workflow IDs:
-   - After importing all workflows, note their IDs from the URL
-   - Update the `workflowId` fields in the main workflow's executeWorkflow nodes to match the actual IDs of the agent workflows
+7. If you already deployed before this change, restart the `n8n` service once so the workflows are imported into the database.
 
 ## Workflows
+
+Workflow JSON files are mounted into the container and imported during startup with `n8n import:workflow --separate`.
+Because the files include stable top-level workflow IDs, repeat deploys keep the cross-workflow references intact.
 
 ### Main Workflow: `telegram-ai-content-creator.json`
 - **Trigger**: Telegram messages
@@ -145,6 +149,8 @@ This repository includes a deploy workflow for Linux VPS deployment:
 1. Ensure `docker` and `docker-compose` are installed on VPS.
 2. Create `/opt/n8n/.env` on VPS with your values.
 3. Allow the deploy user to run `docker compose`.
+
+Deployments now force-recreate the containers and wait for the `n8n` startup logs to confirm that workflow import has started.
 
 ## Volumes
 

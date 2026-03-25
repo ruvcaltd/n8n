@@ -2,6 +2,7 @@ services:
   n8n:
     image: n8nio/n8n:latest
     restart: always
+    command: ["/bin/sh", "/docker-entrypoint-import.sh"]
     ports:
       - "5678:5678"
     env_file:
@@ -18,8 +19,10 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./workflows:/home/node/.n8n/workflows
+      - ./import-workflows.sh:/docker-entrypoint-import.sh:ro
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:13
@@ -30,6 +33,11 @@ services:
       - POSTGRES_DB=n8n
       - POSTGRES_USER=n8n
       - POSTGRES_PASSWORD=${DB_POSTGRESDB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

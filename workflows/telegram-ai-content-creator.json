@@ -1,4 +1,5 @@
 {
+  "id": "telegram-ai-content-creator",
   "name": "Telegram AI Content Creator",
   "description": "Telegram bot that collects user ideas, processes with multiple AI agents, and creates LinkedIn posts",
   "nodes": [

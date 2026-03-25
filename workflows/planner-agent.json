@@ -1,4 +1,5 @@
 {
+  "id": "planner-agent",
   "name": "Planner Agent",
   "description": "AI agent that plans and structures content creation based on user input",
   "nodes": [

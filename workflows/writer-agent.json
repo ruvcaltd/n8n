@@ -1,4 +1,5 @@
 {
+  "id": "writer-agent",
   "name": "Writer Agent",
   "description": "AI agent that writes engaging LinkedIn post content",
   "nodes": [

@@ -47,7 +47,21 @@ jobs:
               exit 1
             fi
             docker compose pull
-            docker compose up -d
+            docker compose up -d --force-recreate
+
+            echo 'Waiting for workflow import log entry...'
+            import_attempts=0
+            until docker compose logs --no-color n8n 2>&1 | grep -q 'Importing workflows from'; do
+              import_attempts=$((import_attempts + 1))
+              if [ ${import_attempts} -ge 24 ]; then
+                echo 'ERROR: Timed out waiting for n8n workflow import to start.'
+                docker compose logs --no-color n8n | tail -n 100
+                exit 1
+              fi
+              sleep 5
+            done
+
+            echo 'Workflow import detected in n8n startup logs.'
             docker compose ps
           EOF
 
